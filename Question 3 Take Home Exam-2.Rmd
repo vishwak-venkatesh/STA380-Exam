@@ -1,0 +1,312 @@
+---
+title: "TakeHomeExamPart-2 Q3"
+author: "Nittala Venkata Sai Aditya"
+output: word_document
+date: "2022-08-08"
+---
+
+## Q3: Visual story telling part 1: green buildings
+```{r setup, echo=FALSE}
+library(dplyr)
+
+green_buildings=read.csv("STA380/data/greenbuildings.csv")
+nrow(green_buildings)
+buildings_1 <-subset(green_buildings, leasing_rate>10)
+nrow(buildings_1)
+gb <- subset(buildings_1, stories<16 & stories>14 & green_rating==1 & size>200000 & size<300000)
+ngb <- subset(buildings_1, stories<16 & stories>14 & green_rating==0 & size>200000 & size<300000)
+
+plot(buildings_1$Rent,buildings_1$cluster)
+
+
+```
+
+```{r, echo=FALSE}
+all_ngb <- subset(buildings_1, green_rating==0)
+all_gb <- subset(buildings_1, green_rating==1)
+buildings_2 <- aggregate(all_ngb$cluster_rent, by=list(all_ngb$cluster), FUN=median)
+buildings_2<-buildings_2 %>% 
+  rename(
+    cluster = Group.1,
+    median_ngb_rent = x
+  )
+gb_cluster <- all_gb[,c('cluster','Rent')]
+gb_cluster<-gb_cluster %>% 
+  rename(
+    gb_rent = Rent
+  )
+clusterwise <- merge(buildings_2,gb_cluster,by="cluster")
+plot(clusterwise$cluster, clusterwise$median_ngb_rent, type='l')
+lines(clusterwise$cluster, clusterwise$gb_rent, type='l',col='red')
+```
+
+Firstly we have compared the green buildings in each cluster to non-green buildings 
+in the same cluster to have an advantage of a green building. It makes sense that buildings with occupancy<10% should be removed. There are 215 such buildings which are removed
+
+As per the observations, the average rents of green buildings is higher but the avergae electricity cost of the buildings is almost equal. Average gas cost of both gb and ngb is almost equal.
+
+Instead of calculating the median values over the entire data of green and non green buildings, excel guru should have chosen oonly the buildings with similar number of floors and sq ft. 
+
+
+### Exploratory analysis: green buildings  
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE }
+library(plyr)
+# library(dplyr)
+library(ggplot2)
+library(gridExtra)
+green.df.raw = read.csv('STA380/data/greenbuildings.csv',na.strings = '')
+```
+#### Step 1: Analysis on all buildings  
+1.Obtain a brief idea about the columns in the dataset  
+```{r, echo = FALSE, message=FALSE, warning=FALSE }
+str(green.df.raw)
+
+green_buildings = subset(green.df.raw,green.df.raw$green_rating == 1)
+non_green_buildings = subset(green.df.raw,green.df.raw$green_rating!= 1)
+
+# Median rent in green buildings and non-green buildings
+print(paste("Median rent of green buildings : ", median(green_buildings$Rent)))
+print(paste("Median rent of green buildings : ", median(non_green_buildings$Rent)))
+
+# Leasing -rate in green buildings vs non-green buildings
+green.df.raw$green_rating = as.factor(green.df.raw$green_rating)
+leasing_plot <- ggplot(green.df.raw, aes(x = green_rating, y = leasing_rate)) +
+        geom_boxplot(colour = "grey", fill = "#CC9900") + theme_classic() + 
+  labs(x = "Green and Non-Green", y = "Rent",title = "Leasing Rate",subtitle = "All buildings") + theme(
+    axis.text.x = element_text(face="bold",color="black", size=8, angle=0),
+    axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),
+    plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5)
+    )+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="red", fill="red")
+leasing_plot
+
+print(paste("Median leasing rate of green buildings : ", median(green_buildings$leasing_rate)))
+print(paste("Median leasing rate of non green buildings : ", median(non_green_buildings$leasing_rate)))
+
+```
+* Green buildings have a higher occupancy rate when compared to non-green buildings  
+* As the stats guru, pointed out the median of green buildings($27.6) is higher than the median of non-green buildings($25). But he did not consider the effect of confouding variables while performing the analysis. In teh next section, we will check or the influence of confounding vairables on the Rent of green and non-green buildings  
+
+
+2.We will create some hypotheses using which we will steer through the data to understand if the data agrees with the respective hypotheses  
+a.Less leasing_rate might be a proxy for less demand for commercial real-estate  
+b.Rent decreases with age for buildings  
+c.Renovated buildings with age >30 years get higher rent than buidings with age < 30 without renovation  
+d.Buidings with amenities have higher rents than the other buildings
+e.class_a buildings have higher rent than the other buildings  
+
+Let's plot the respective distribution to find if the hypotheses can be supported using the relationships  
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(fig.width=20, fig.height=10)
+# Leasing_rate
+leasing_rate = ggplot(green.df.raw, aes(x=leasing_rate, y=Rent))+
+  theme_classic()+geom_point(colour = "darkolivegreen", size = 1.5,alpha = 0.5) + labs(x = "Leasing Rate", y = "Rent",title = "Leasing Rate Vs Rent",subtitle = "All buildings") + 
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+#Age
+age = ggplot(green.df.raw,aes(x = age,y = Rent)) +
+  theme_classic()+geom_point(colour = "navyblue", size = 1.5,alpha = 0.5)+ labs(x = "Age", y = "Rent",title = "Age Vs Rent",subtitle = "All buildings") + 
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+#Renovations
+green.df.raw$renovated = as.factor(green.df.raw$renovated)
+renovation <- ggplot(green.df.raw, aes(x = renovated, y = Rent)) +
+        geom_boxplot(colour = "grey", fill = "#CC9900") + theme_classic() + 
+  labs(x = "Renovation(Yes:1| No:0)", y = "Rent",title = "Renovation Vs Rent",subtitle = "All buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="red", fill="red")
+
+# Renovations in buildings older than 30 years
+renovation_30_years_more = subset(green.df.raw,green.df.raw$age >=30)
+renovation_30 <- ggplot(renovation_30_years_more, aes(x = renovated, y = Rent)) +
+        geom_boxplot(colour = "darkgrey", fill = "#33CC99") + theme_classic() + 
+  labs(x = "Renovation(Yes:1| No:0)", y = "Rent",title = "Old renovated buildings Vs Rent",subtitle = "All buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#999900", fill="red")
+
+#Amenities
+green.df.raw$amenities = as.factor(green.df.raw$amenities)
+amenities <- ggplot(green.df.raw, aes(x = amenities, y = Rent)) +
+        geom_boxplot(colour = "lightgrey", fill = "#000066") + theme_classic() + 
+  labs(x = "Amenities", y = "Rent",title = "Amenities Vs Rent",subtitle = "All buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#00FF66", fill="red")  
+
+#class_a buildings
+green.df.raw$class_a = as.factor(green.df.raw$class_a)
+class_a <- ggplot(green.df.raw, aes(x = class_a, y = Rent)) +
+        geom_boxplot(colour = "lightgrey", fill = "#000066") + theme_classic() + 
+  labs(x = "class_a", y = "Rent",title = "class_a Vs Rent",subtitle = "All buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#00FF66", fill="red")  
+
+grid.arrange(leasing_rate,age,renovation,renovation_30,amenities,class_a,ncol = 3)  
+```
+
+**Findings**:      
+* Age has no visible relation with Rent when all buildings are considered      
+* Buildings with Amenities and class_a quality material have slightly higher rent than the other buildings    
+
+#### Step 2: Comparison of different variables for Green and Non-Green buildings  
+Lets check the above hypotheses for Green and Non-Green buildings separtely to see if there is any influence  
+
+```{r, fig.width=10, fig.height=20, echo = FALSE, message=FALSE, warning=FALSE}
+# Splitting the data into green and non-green buildings
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+green_buildings = subset(green.df.raw,green.df.raw$green_rating == 1)
+non_green_buildings = subset(green.df.raw,green.df.raw$green_rating!= 1)
+
+# Leasing_rate
+# Green
+leasing_rate_g = ggplot(green_buildings, aes(x=leasing_rate, y=Rent)) + 
+  theme_classic()+geom_point(colour = "darkolivegreen", size = 1.5,alpha= 0.5) + labs(x = "Leasing Rate", y = "Rent",title = "Leasing Rate Vs Rent",subtitle = "Green buildings") + ylim(0,250) +
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+# Non Green
+leasing_rate_ng = ggplot(non_green_buildings, aes(x=leasing_rate, y=Rent)) + 
+  theme_classic()+geom_point(colour = "darkolivegreen", size = 1.5,alpha= 0.5) + labs(x = "Leasing Rate", y = "Rent",title = "Leasing Rate Vs Rent",subtitle = "Non Green buildings") + ylim(0,250) +
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+#Age
+age_g = ggplot(green_buildings,aes(x = age,y = Rent)) + 
+  theme_classic()+geom_point(colour = "navyblue", size = 1.5,alpha = 0.5)+ labs(x = "Age", y = "Rent",title = "Age Vs Rent",subtitle = "Green buildings") + ylim(0,250) +
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+#Renovations
+
+renovation_g <- ggplot(green_buildings, aes(x = renovated, y = Rent)) +
+  geom_boxplot(colour = "grey", fill = "#CC9900") + ylim(0,250) + theme_classic() + 
+  labs(x = "Renovation(Yes:1| No:0)", y = "Rent",title = "Renovation Vs Rent",subtitle = "Green buildings") + 
+  theme(
+    axis.text.x = element_text(face="bold",color="black", size=8, angle=0),
+    axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),
+    plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5)
+    )+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="red", fill="red")
+
+# Renovations in buildings older than 30 years
+renovation_30_years_more = subset(green_buildings,green_buildings$age >=30)
+renovation_30_g <- ggplot(renovation_30_years_more, aes(x = renovated, y = Rent)) +
+        geom_boxplot(colour = "darkgrey", fill = "#33CC99") + theme_classic() + ylim(0,250) + labs(x = "Renovation(Yes:1| No:0)", y = "Rent",title = "Old renovated buildings Vs Rent",subtitle = "Green buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#999900", fill="red")
+
+#Amenities
+amenities_g <- ggplot(green_buildings, aes(x = amenities, y = Rent)) +
+        geom_boxplot(colour = "lightgrey", fill = "#000066") + theme_classic() + ylim(0,250) + labs(x = "Amenities", y = "Rent",title = "Amenities Vs Rent",subtitle = "Green buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#00FF66", fill="red")  
+
+#class_a buildings
+class_a_g <- ggplot(green_buildings, aes(x = class_a, y = Rent)) +
+        geom_boxplot(colour = "lightgrey", fill = "#000066") + theme_classic() + ylim(0,250) +  labs(x = "class_a", y = "Rent",title = "class_a Vs Rent",subtitle = "Green buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#00FF66", fill="red")  
+
+
+## Non-Green buildings
+leasing_rate_ng = ggplot(non_green_buildings, aes(x=leasing_rate, y=Rent)) + theme_classic()+geom_point(colour = "darkolivegreen", size = 1.5) + labs(x = "Leasing Rate", y = "Rent",title = "Leasing Rate Vs Rent",subtitle = "Non-Green buildings") + 
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),
+        plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+
+#Age
+age_ng = ggplot(non_green_buildings,aes(x = age,y = Rent)) + geom_point() + 
+  theme_classic()+geom_point(colour = "navyblue", size = 1.5)+ labs(x = "Age", y = "Rent",title = "Age Vs Rent",subtitle = "Non-Green buildings") + 
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+#Renovations
+
+renovation_ng <- ggplot(non_green_buildings, aes(x = renovated, y = Rent)) +
+        geom_boxplot(colour = "grey", fill = "#CC9900") + theme_classic() + 
+  labs(x = "Renovation(Yes:1| No:0)", y = "Rent",title = "Renovation Vs Rent",subtitle = "Non-Green buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="red", fill="red")
+
+# Renovations in buildings older than 30 years
+renovation_30_years_more = subset(non_green_buildings,non_green_buildings$age >=30)
+renovation_30_ng <- ggplot(renovation_30_years_more, aes(x = renovated, y = Rent)) +
+        geom_boxplot(colour = "darkgrey", fill = "#33CC99") + theme_classic() + 
+  labs(x = "Renovation(Yes:1| No:0)", y = "Rent",title = "Old renovated buildings Vs Rent",subtitle = "Non-Green buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#999900", fill="red")
+
+#Amenities
+amenities_ng <- ggplot(non_green_buildings, aes(x = amenities, y = Rent)) +
+        geom_boxplot(colour = "lightgrey", fill = "#000066") + theme_classic() + 
+  labs(x = "Amenities", y = "Rent",title = "Amenities Vs Rent",subtitle = "Non-Green buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#00FF66", fill="red")  
+
+#class_a buildings
+class_a_ng <- ggplot(non_green_buildings, aes(x = class_a, y = Rent)) +
+        geom_boxplot(colour = "lightgrey", fill = "#000066") + theme_classic() + 
+  labs(x = "class_a", y = "Rent",title = "class_a Vs Rent",subtitle = "Non-Green buildings") + theme(axis.text.x = element_text(face="bold",color="black", size=8, angle=0), axis.text.y = element_text(face="bold", color="black", size=8,    angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))+ stat_summary(fun.y=median, geom="point", shape=20, size=3, color="#00FF66", fill="red")
+
+grid.arrange(leasing_rate_g,leasing_rate_ng,age_g,age_ng,renovation_g,renovation_ng,renovation_30_g,renovation_30_ng,amenities_g,amenities_ng,class_a_g,class_a_ng,ncol = 2)
+
+```
+**Findings**:   
+* Older Green Buildings have the possibility of charging higher rents when they are renovated   
+* There are no variables that affect the distribution of rent even after the buildings are split into green and non-green buildings  
+
+#### Step 3: Deep Diving into some of the potential variables to see the difference between rents between green and non-green buildings    
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+##### Subsetting for Age
+green_buildings_by_age = subset(green.df.raw,green.df.raw$green_rating == 1 & green.df.raw$age <= 30 & green.df.raw$net ==0)
+non_green_buildings_by_age = subset(green.df.raw,green.df.raw$green_rating!= 1 & green.df.raw$age <= 30 & green.df.raw$net ==0)
+
+#Age plots and rent
+rent_g_by_age = ggplot(green_buildings_by_age,aes(x = age,y = Rent)) + ylim(0,150) +
+  theme_classic()+geom_point(colour = "navyblue", size = 1.5, alpha = 0.5)+ labs(x = "Age", y = "Rent",title = "Age(<=30) Vs Rent",subtitle = "Green buildings") + 
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+rent_ng_by_age = ggplot(non_green_buildings_by_age,aes(x = age,y = Rent)) +
+ ylim(0,150) + theme_classic()+geom_point(colour = "navyblue", size = 1.5, alpha = 0.5)+ labs(x = "Age", y = "Rent",title = "Age(<=30) Vs Rent",subtitle = "Non-Green buildings") + 
+  theme(axis.text.x =     
+          element_text(face="bold",color="black", size=8, angle=0),
+          axis.text.y = element_text(face="bold", color="black", size=8, angle=0),plot.title = element_text(hjust = 0.5),plot.subtitle = element_text(hjust = 0.5))
+
+grid.arrange(rent_g_by_age,rent_ng_by_age,ncol = 2)
+print(paste("Median rent of green buildings less than 30 years of age:",median(green_buildings_by_age$Rent)))
+print(paste("Median rent of non - green buildings less than 30 years of age:",median(non_green_buildings_by_age$Rent)))
+
+```
+**Findings:**    
+* Age of the building does not affect the rent of the buildings as the green buildings have consistently higher rents across ages  
+
+#### After exploring multiple variables, it is clear that there is no one variable that affects the rent and clearly people are willing to pay more rent based on the green perception of the building although there is no way to quantify that experience
+
+#### Step 4: As it is evident that people are willing to pay more for the green buildings,lets come up with an estimate for the returns on building a green building    
+
+1.Lets consider a local market(cluster) to check the probability of receiving a particular amount of rent  
+* Let us check the distribution of cluster rents to understand the local markets  
+* You can observe that more than 50% of the markets have rent less than $25 rent  
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# Histogram of cluster rents
+hist(unique(green.df.raw$cluster_rent),main = paste("Histogram of Cluster rent"),xlab = 'Rent')
+abline(v = median(unique(green.df.raw$cluster_rent)), col="red", lwd=3, lty=2)
+```
+**We can further calculate the number of local markets in which the rent for green building is higher than the median cluster rent as median is more robust to outliers**
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+cluster_quants = ddply(green.df.raw,.(cluster), function(x)quantile(x$Rent))[c('cluster','50%')]
+
+temp = merge(green_buildings,cluster_quants,by = 'cluster')
+more_rent_green = subset(temp,temp$'Rent' >= temp$'50%')
+less_rent_green = subset(temp,temp$'Rent' < temp$'50%')
+
+# Median rent calculations have been performed using this code
+# abs(mean(more_rent_green$'Rent' - more_rent_green$'50%'))
+# abs(mean(less_rent_green$'Rent' - less_rent_green$'50%'))
+# abs(mean(temp$'Rent' - temp$'50%'))
+```
+* Green buildings have higher rents than the median rents in more than 75% of the local markets and on an averge it is $4.89    
+* In about 25% of the local markets, green buildings have lesser rent than the median rents and the value is $3 on an average    
+* With these observations,we can conclude that there is more than 75% chance that you will earn higher rents than the average in the local markets with a value more than $4.89       
+
+2.Estimate for calculating the returns on building a green building  
+* If we consider the mean of the differences between green buildings and the median local market rents, we see that green buildings get ~$3 more than the non-green builings    
+
+**When we do the calculation based on floors and sq ft, rent of green buildings is around $18.75 more than non-green buildings resulting in $18.75*250000 = $4,687,500 extra revenue per year which means that we have covered the extra 5% premium within an year. This is a great financial move to build a green building.**  
+
+
+
+
